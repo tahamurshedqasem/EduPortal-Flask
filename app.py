@@ -1,40 +1,52 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests, os, json, re, time
+import requests, os, json, re, time, concurrent.futures
 
 app = Flask(__name__)
 
 # ✅ Allow CORS for frontend (localhost + production)
 CORS(app, resources={r"/*": {"origins": ["*", "http://localhost:3000", "https://eduportal.pro"]}})
 
-# 🔑 Gemini API Key
+# 🔑 Gemini API Key (keep secure in env on production)
 GEMINI_API_KEY = "AIzaSyCEOfdNy2sIdO-g2vlItsgT9Ncpuu58BaY"
+# ⚡ Gemini 2.0 Flash is fast and handles large JSON output better
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
-# 🧠 Build prompt helper
+# ⚙️ Thread pool for parallel requests
+executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+
+# 🧠 Build prompt helper (simplified for speed)
 def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", answers=None, student_id=""):
     if task == "generate":
         if lang == "ar":
             return f"""
             أنت خبير في إعداد الاختبارات.
-            المهمة: أنشئ {count} أسئلة فريدة ومبتكرة لامتحان {exam_type}.
+            أنشئ {count} أسئلة متعددة الخيارات لامتحان {exam_type}.
             الصف: {grade}
             المادة: {subject}
 
-            ✅ القواعد:
-            - لا تكرر الأسئلة.
-            - يجب أن تحتوي كل سؤال على:
+            كل سؤال بصيغة JSON يتضمن:
+            {{
                 "id": رقم,
-                "difficulty": "سهل" أو "متوسط" أو "صعب",
-                "question": "نص السؤال",
+                "question": "النص",
                 "options": ["أ", "ب", "ج", "د"],
                 "correct_answer": "الإجابة الصحيحة"
-            - أرجع فقط مصفوفة JSON صحيحة بدون شروحات.
+            }}
+            أرجع مصفوفة JSON فقط بدون شرح.
             """
         else:
             return f"""
-            You are an expert exam creator. Generate {count} multiple-choice questions in concise JSON with keys: id, question, options, correct_answer.
-
+            You are an expert exam creator. Create {count} concise multiple-choice questions 
+            for a {exam_type} exam in grade {grade} ({subject}). 
+            Return ONLY valid JSON like:
+            [
+              {{
+                "id": 1,
+                "question": "Sample question?",
+                "options": ["A", "B", "C", "D"],
+                "correct_answer": "A"
+              }}
+            ]
             """
     else:
         if lang == "ar":
@@ -43,68 +55,56 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
             الصف: {grade}
             المادة: {subject}
             معرف الطالب: {student_id}
-
             إجابات الطالب:
             {answers}
 
-            أرجع JSON بالصيغة التالية:
+            أرجع JSON مثل:
             {{
-              "score": <رقم من 0 إلى 100>,
-              "feedback": [
-                {{
-                  "question": "...",
-                  "student_answer": "...",
-                  "correct_answer": "...",
-                  "comment": "..."
-                }}
-              ]
+              "score": <رقم>,
+              "feedback": [{{"question": "...", "student_answer": "...", "correct_answer": "...", "comment": "..."}}]
             }}
             """
         else:
             return f"""
-            Evaluate student's answers for a {exam_type} exam.
-            Grade: {grade}
-            Subject: {subject}
+            Evaluate the student's answers for a {exam_type} exam ({subject}, grade {grade}).
             Student ID: {student_id}
-
-            Student answers:
+            Answers:
             {answers}
 
             Return JSON like:
             {{
-              "score": <number from 0-100>,
-              "feedback": [
-                {{
-                  "question": "...",
-                  "student_answer": "...",
-                  "correct_answer": "...",
-                  "comment": "..."
-                }}
-              ]
+              "score": <number>,
+              "feedback": [{{"question": "...", "student_answer": "...", "correct_answer": "...", "comment": "..."}}]
             }}
             """
 
-# 🟢 Helper to call Gemini safely
+# ⚡ Fast Gemini caller
 def call_gemini(prompt):
-    """Handles Gemini API request with retry and timeout."""
-    for attempt in range(2):  # retry twice
+    try:
+        resp = requests.post(
+            GEMINI_URL,
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=60
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+
+        # Try parsing clean JSON
         try:
-            resp = requests.post(
-                GEMINI_URL,
-                headers={"Content-Type": "application/json"},
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=120
-            )
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as e:
-            print(f"⚠️ Gemini request failed (attempt {attempt+1}): {e}")
-            if attempt == 1:
-                raise e
-            time.sleep(1.5)  # wait before retry
+            return json.loads(raw_text)
+        except:
+            match = re.search(r"\[.*\]", raw_text, re.S)
+            if match:
+                return json.loads(match.group(0))
+            raise ValueError("Invalid JSON output")
 
+    except Exception as e:
+        print(f"⚠️ Gemini error: {e}")
+        return []
 
-# 🟢 Generate Questions Endpoint (with batching)
+# 🟢 Parallelized generate-questions endpoint
 @app.route("/generate-questions", methods=["POST"])
 def generate_questions():
     try:
@@ -112,50 +112,43 @@ def generate_questions():
         exam_type = data.get("examType", "TIMSS")
         grade = data.get("grade", "Grade 8")
         subject = data.get("subject", "Math")
-        total_count = int(data.get("count", 5))
+        total_count = int(data.get("count", 10))
         lang = data.get("lang", "en")
 
-        all_questions = []
-        batch_size = 5  # ✅ Generate in chunks to avoid timeouts
+        # ✅ Parallel batching (6 workers)
+        batch_size = 5
+        batches = [(exam_type, grade, subject, batch_size, lang) 
+                   for _ in range(0, total_count, batch_size)]
 
-        for i in range(0, total_count, batch_size):
-            count = min(batch_size, total_count - i)
-            print(f"🧩 Generating batch {i//batch_size + 1} of {count} questions...")
+        start_time = time.time()
 
-            prompt = build_prompt(exam_type, grade, subject, count, lang=lang, task="generate")
-            gemini_data = call_gemini(prompt)
-            raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
+        def generate_batch(params):
+            e_type, g, subj, count, l = params
+            prompt = build_prompt(e_type, g, subj, count, lang=l)
+            return call_gemini(prompt)
 
-            try:
-                batch_questions = json.loads(raw_text)
-            except:
-                match = re.search(r"\[.*\]", raw_text, re.S)
-                if match:
-                    batch_questions = json.loads(match.group(0))
-                else:
-                    raise ValueError(f"Invalid JSON in batch {i//batch_size + 1}")
+        results = list(executor.map(generate_batch, batches))
+        all_questions = [q for batch in results for q in batch]
 
-            # Ensure unique IDs across all batches
-            for q in batch_questions:
-                if "id" not in q:
-                    q["id"] = len(all_questions) + 1
+        # Ensure unique IDs
+        for i, q in enumerate(all_questions, start=1):
+            q["id"] = i
 
-            all_questions.extend(batch_questions)
+        elapsed = round(time.time() - start_time, 2)
+        print(f"✅ Generated {len(all_questions)} questions in {elapsed} seconds.")
 
         return jsonify({
             "examType": exam_type,
             "timeLimit": f"{40 + total_count//5} minutes",
-            "questions": all_questions
+            "questions": all_questions,
+            "elapsed": f"{elapsed} sec"
         }), 200
 
     except Exception as e:
         print("❌ Error in /generate-questions:", e)
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": "Failed to generate questions", "details": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
-
-# 🟢 Evaluate Endpoint
+# 🟢 Evaluate endpoint
 @app.route("/evaluate", methods=["POST"])
 def evaluate():
     try:
@@ -168,30 +161,17 @@ def evaluate():
         lang = data.get("lang", "en")
 
         prompt = build_prompt(exam_type, grade, subject, None, lang=lang, task="evaluate", answers=answers, student_id=student_id)
-        gemini_data = call_gemini(prompt)
-        raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
-
-        try:
-            feedback_json = json.loads(raw_text)
-        except:
-            match = re.search(r"\{.*\}", raw_text, re.S)
-            if match:
-                feedback_json = json.loads(match.group(0))
-            else:
-                feedback_json = {"score": None, "feedback": raw_text}
-
-        return jsonify(feedback_json), 200
+        result = call_gemini(prompt)
+        return jsonify(result), 200
 
     except Exception as e:
         print("❌ Error in /evaluate:", e)
-        return jsonify({"error": "Failed to evaluate answers", "details": str(e)}), 500
-
+        return jsonify({"error": str(e)}), 500
 
 # ✅ Health check route
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"status": "EduPortal Flask API running successfully"}), 200
-
 
 # ✅ Run locally (Render uses gunicorn)
 if __name__ == "__main__":
