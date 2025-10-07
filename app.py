@@ -8,9 +8,9 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["*", "http://localhost:3000", "https://eduportal.pro"]}})
 
 # 🔑 Gemini API Key (keep secure in env on production)
-GEMINI_API_KEY = "AIzaSyCEOfdNy2sIdO-g2vlItsgT9Ncpuu58BaY"
+GEMINI_API_KEY = "AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s"
 # ⚡ Gemini 2.0 Flash is fast and handles large JSON output better
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}"
 
 # ⚙️ Thread pool for parallel requests
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
@@ -101,7 +101,7 @@ def call_gemini(prompt):
             raise ValueError("Invalid JSON output")
 
     except Exception as e:
-        print(f"⚠️ Gemini error: {e}")
+        print(f" Gemini error: {e}")
         return []
 
 # 🟢 Parallelized generate-questions endpoint
@@ -135,7 +135,7 @@ def generate_questions():
             q["id"] = i
 
         elapsed = round(time.time() - start_time, 2)
-        print(f"✅ Generated {len(all_questions)} questions in {elapsed} seconds.")
+        print(f" Generated {len(all_questions)} questions in {elapsed} seconds.")
 
         return jsonify({
             "examType": exam_type,
@@ -145,7 +145,7 @@ def generate_questions():
         }), 200
 
     except Exception as e:
-        print("❌ Error in /generate-questions:", e)
+        print(" Error in /generate-questions:", e)
         return jsonify({"error": str(e)}), 500
 
 # 🟢 Evaluate endpoint
@@ -165,7 +165,7 @@ def evaluate():
         return jsonify(result), 200
 
     except Exception as e:
-        print("❌ Error in /evaluate:", e)
+        print(" Error in /evaluate:", e)
         return jsonify({"error": str(e)}), 500
 
 # ✅ Health check route
