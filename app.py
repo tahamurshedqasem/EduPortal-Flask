@@ -33,21 +33,8 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
             """
         else:
             return f"""
-            You are an expert exam creator.
+            You are an expert exam creator. Generate {count} multiple-choice questions in concise JSON with keys: id, question, options, correct_answer.
 
-            Task: Generate {count} unique and creative questions for a {exam_type} exam.
-            Grade: {grade}
-            Subject: {subject}
-
-            ✅ Rules:
-            - No duplicate questions.
-            - Each question must include:
-                "id": number,
-                "difficulty": "Easy" or "Medium" or "Hard",
-                "question": "the question text",
-                "options": ["A", "B", "C", "D"],
-                "correct_answer": "the correct option"
-            - Return ONLY a valid JSON array, no explanations.
             """
     else:
         if lang == "ar":
@@ -114,7 +101,7 @@ def call_gemini(prompt):
             print(f"⚠️ Gemini request failed (attempt {attempt+1}): {e}")
             if attempt == 1:
                 raise e
-            time.sleep(3)  # wait before retry
+            time.sleep(1.5)  # wait before retry
 
 
 # 🟢 Generate Questions Endpoint (with batching)
@@ -129,7 +116,7 @@ def generate_questions():
         lang = data.get("lang", "en")
 
         all_questions = []
-        batch_size = 10  # ✅ Generate in chunks to avoid timeouts
+        batch_size = 5  # ✅ Generate in chunks to avoid timeouts
 
         for i in range(0, total_count, batch_size):
             count = min(batch_size, total_count - i)
