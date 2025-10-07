@@ -8,9 +8,9 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["*", "http://localhost:3000", "https://eduportal.pro"]}})
 
 # 🔑 Gemini API Key (keep secure in env on production)
-GEMINI_API_KEY = "AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s"
+GEMINI_API_KEY = "AIzaSyA6VyEO3weAJLVm39d_GmmSlzkn8NvTuZw"
 # ⚡ Gemini 2.0 Flash is fast and handles large JSON output better
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={GEMINI_API_KEY}"
 
 # ⚙️ Thread pool for parallel requests
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
