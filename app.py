@@ -106,7 +106,7 @@ def call_gemini(prompt):
                 GEMINI_URL,
                 headers={"Content-Type": "application/json"},
                 json={"contents": [{"parts": [{"text": prompt}]}]},
-                timeout=70
+                timeout=120
             )
             resp.raise_for_status()
             return resp.json()
@@ -117,7 +117,7 @@ def call_gemini(prompt):
             time.sleep(3)  # wait before retry
 
 
-# 🟢 Generate Questions Endpoint
+# 🟢 Generate Questions Endpoint (with batching)
 @app.route("/generate-questions", methods=["POST"])
 def generate_questions():
     try:
@@ -125,32 +125,46 @@ def generate_questions():
         exam_type = data.get("examType", "TIMSS")
         grade = data.get("grade", "Grade 8")
         subject = data.get("subject", "Math")
-        count = data.get("count", 5)
+        total_count = int(data.get("count", 5))
         lang = data.get("lang", "en")
 
-        prompt = build_prompt(exam_type, grade, subject, count, lang=lang, task="generate")
+        all_questions = []
+        batch_size = 10  # ✅ Generate in chunks to avoid timeouts
 
-        gemini_data = call_gemini(prompt)
-        raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
+        for i in range(0, total_count, batch_size):
+            count = min(batch_size, total_count - i)
+            print(f"🧩 Generating batch {i//batch_size + 1} of {count} questions...")
 
-        # Try to parse valid JSON array
-        try:
-            questions = json.loads(raw_text)
-        except:
-            match = re.search(r"\[.*\]", raw_text, re.S)
-            if match:
-                questions = json.loads(match.group(0))
-            else:
-                return jsonify({"error": "Invalid JSON returned from Gemini", "raw": raw_text}), 500
+            prompt = build_prompt(exam_type, grade, subject, count, lang=lang, task="generate")
+            gemini_data = call_gemini(prompt)
+            raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
+
+            try:
+                batch_questions = json.loads(raw_text)
+            except:
+                match = re.search(r"\[.*\]", raw_text, re.S)
+                if match:
+                    batch_questions = json.loads(match.group(0))
+                else:
+                    raise ValueError(f"Invalid JSON in batch {i//batch_size + 1}")
+
+            # Ensure unique IDs across all batches
+            for q in batch_questions:
+                if "id" not in q:
+                    q["id"] = len(all_questions) + 1
+
+            all_questions.extend(batch_questions)
 
         return jsonify({
             "examType": exam_type,
-            "timeLimit": "40 minutes",
-            "questions": questions
+            "timeLimit": f"{40 + total_count//5} minutes",
+            "questions": all_questions
         }), 200
 
     except Exception as e:
         print("❌ Error in /generate-questions:", e)
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": "Failed to generate questions", "details": str(e)}), 500
 
 
@@ -167,7 +181,6 @@ def evaluate():
         lang = data.get("lang", "en")
 
         prompt = build_prompt(exam_type, grade, subject, None, lang=lang, task="evaluate", answers=answers, student_id=student_id)
-
         gemini_data = call_gemini(prompt)
         raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
 
