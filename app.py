@@ -85,7 +85,7 @@ def call_gemini(prompt):
             GEMINI_URL,
             headers={"Content-Type": "application/json"},
             json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=60
+            timeout=200
         )
         resp.raise_for_status()
         data = resp.json()
