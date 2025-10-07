@@ -211,7 +211,7 @@ CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://edupo
 
 # 🔑 Gemini API Configuration
 # ⚠️ Do NOT use os.getenv() incorrectly — set the key directly or use an environment variable
-GEMINI_API_KEY = "AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s"
+GEMINI_API_KEY = "AIzaSyCEOfdNy2sIdO-g2vlItsgT9Ncpuu58BaY"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 # 🧠 Helper Function: Build Prompt
