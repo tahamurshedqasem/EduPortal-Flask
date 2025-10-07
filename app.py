@@ -9,7 +9,7 @@ CORS(app, resources={r"/*": {"origins": ["*", "http://localhost:3000", "https://
 
 # 🔑 Gemini API Key
 GEMINI_API_KEY = "AIzaSyCEOfdNy2sIdO-g2vlItsgT9Ncpuu58BaY"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
 # 🧠 Build prompt helper
 def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", answers=None, student_id=""):
