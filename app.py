@@ -1,258 +1,53 @@
-# from flask import Flask, request, jsonify
-# import requests, os, json, re
-
-# app = Flask(__name__)
-
-# # 🔑 Gemini API
-# GEMINI_API_KEY = os.getenv("AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s")
-# GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s"
-
-
-# # 🟢 Helper: Build Prompt
-# def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", answers=None, student_id=""):
-#     if task == "generate":
-#         if lang == "ar":
-#             return f"""
-#             أنت خبير في إعداد الاختبارات.
-
-#             المهمة: أنشئ {count} أسئلة فريدة ومبتكرة لامتحان {exam_type}.  
-#             الصف: {grade}  
-#             المادة: {subject}  
-
-#             ✅ القواعد:
-#             - لا يوجد أسئلة مكررة.
-#             - يجب أن تكون الأسئلة متنوعة ومناسبة للمستوى.
-#             - كل سؤال يجب أن يحتوي على:
-#                 "id": رقم,
-#                 "question": "نص السؤال",
-#                 "options": ["أ", "ب", "ج", "د"],
-#                 "correct_answer": "الإجابة الصحيحة"
-#             - استخدم مستويات صعوبة مختلفة (سهل، متوسط، صعب).
-#             - أرجع فقط مصفوفة JSON صحيحة بدون أي شروح.
-
-#             مثال:
-#             [
-#               {{
-#                 "id": 1,
-#                 "difficulty": "سهل",
-#                 "question": "ما نتيجة 2 + 2؟",
-#                 "options": ["3", "4", "5", "6"],
-#                 "correct_answer": "4"
-#               }},
-#               {{
-#                 "id": 2,
-#                 "difficulty": "متوسط",
-#                 "question": "حل: 5س - 7 = 18",
-#                 "options": ["س=3", "س=4", "س=5", "س=6"],
-#                 "correct_answer": "س=5"
-#               }}
-#             ]
-#             """
-#         else:  # English prompt
-#             return f"""
-#             You are an expert exam creator.
-
-#             Task: Generate {count} UNIQUE and Creative questions for a {exam_type} exam.  
-#             Grade: {grade}  
-#             Subject: {subject}  
-
-#             ✅ Rules:
-#             - No duplicate or repeated questions.
-#             - Creative and varied concepts for each question.
-#             - Each question must have:
-#                 "id": number,
-#                 "question": "the question text",
-#                 "options": ["A", "B", "C", "D"],
-#                 "correct_answer": "the correct option"
-#             - Use **different difficulty levels** (Easy, Medium, Hard).
-#             - Return ONLY a valid JSON array with no explanations.
-#             """
-#     else:  # evaluate
-#         if lang == "ar":
-#             return f"""
-#             قم بتقييم إجابات الطالب لامتحان {exam_type}.
-
-#             الصف: {grade}
-#             المادة: {subject}
-#             معرف الطالب: {student_id}
-
-#             إجابات الطالب:
-#             {answers}
-
-#             أرجع JSON بالصيغة التالية:
-#             {{
-#               "score": <رقم من 0-100>,
-#               "feedback": [
-#                 {{
-#                   "question": "...",
-#                   "student_answer": "...",
-#                   "correct_answer": "...",
-#                   "comment": "..."
-#                 }}
-#               ]
-#             }}
-#             """
-#         else:
-#             return f"""
-#             Evaluate student's answers for a {exam_type} exam.
-
-#             Grade: {grade}
-#             Subject: {subject}
-#             Student ID: {student_id}
-
-#             Student answers:
-#             {answers}
-
-#             Output JSON in this format:
-#             {{
-#               "score": <number from 0-100>,
-#               "feedback": [
-#                 {{
-#                   "question": "...",
-#                   "student_answer": "...",
-#                   "correct_answer": "...",
-#                   "comment": "..."
-#                 }}
-#               ]
-#             }}
-#             """
-
-
-# # 🟢 Generate Questions
-# @app.route("/generate-questions", methods=["POST"])
-# def generate_questions():
-#     data = request.get_json()
-#     exam_type = data.get("examType", "TIMSS")
-#     grade = data.get("grade", "Grade 8")
-#     subject = data.get("subject", "Math")
-#     count = data.get("count", 5)
-#     lang = data.get("lang", "en")  # ✅ pick language
-
-#     prompt = build_prompt(exam_type, grade, subject, count, lang=lang, task="generate")
-
-#     try:
-#         resp = requests.post(
-#             GEMINI_URL,
-#             headers={"Content-Type": "application/json"},
-#             json={"contents": [{"parts": [{"text": prompt}]}]},
-#         )
-#         resp.raise_for_status()
-#         gemini_data = resp.json()
-
-#         raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
-
-#         try:
-#             questions = json.loads(raw_text)
-#         except:
-#             match = re.search(r"\[.*\]", raw_text, re.S)
-#             if match:
-#                 questions = json.loads(match.group(0))
-#             else:
-#                 return jsonify({"error": "Invalid JSON from Gemini", "raw": raw_text}), 500
-
-#         return jsonify({
-#             "examType": exam_type,
-#             "timeLimit": "40 minutes",
-#             "questions": questions
-#         })
-
-#     except Exception as e:
-#         return jsonify({"error": "Failed to generate questions", "details": str(e)}), 500
-
-
-# # 🟢 Evaluate Answers
-# @app.route("/evaluate", methods=["POST"])
-# def evaluate():
-#     data = request.get_json()
-#     exam_type = data.get("examType", "TIMSS")
-#     grade = data.get("grade", "Grade 8")
-#     subject = data.get("subject", "Math")
-#     student_id = data.get("studentId", "test_student")
-#     answers = data.get("answers", [])
-#     lang = data.get("lang", "en")  # ✅ support Arabic feedback
-
-#     prompt = build_prompt(exam_type, grade, subject, None, lang=lang, task="evaluate", answers=answers, student_id=student_id)
-
-#     try:
-#         resp = requests.post(
-#             GEMINI_URL,
-#             headers={"Content-Type": "application/json"},
-#             json={"contents": [{"parts": [{"text": prompt}]}]},
-#         )
-#         resp.raise_for_status()
-#         gemini_data = resp.json()
-#         raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
-
-#         try:
-#             feedback_json = json.loads(raw_text)
-#         except:
-#             match = re.search(r"\{.*\}", raw_text, re.S)
-#             if match:
-#                 feedback_json = json.loads(match.group(0))
-#             else:
-#                 feedback_json = {"score": None, "feedback": raw_text}
-
-#         return jsonify(feedback_json)
-
-#     except Exception as e:
-#         return jsonify({"error": "Failed to evaluate answers", "details": str(e)}), 500
-
-
-# if __name__ == "__main__":
-#     app.run(debug=True, port=5000)
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests, os, json, re
+import requests, os, json, re, time
 
 app = Flask(__name__)
 
-# ✅ Allow CORS for your frontend domains
-CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://eduportal.pro"]}})
+# ✅ Allow CORS for frontend (localhost + production)
+CORS(app, resources={r"/*": {"origins": ["*", "http://localhost:3000", "https://eduportal.pro"]}})
 
-# 🔑 Gemini API Configuration
-# ⚠️ Do NOT use os.getenv() incorrectly — set the key directly or use an environment variable
+# 🔑 Gemini API Key
 GEMINI_API_KEY = "AIzaSyCEOfdNy2sIdO-g2vlItsgT9Ncpuu58BaY"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
-# 🧠 Helper Function: Build Prompt
+# 🧠 Build prompt helper
 def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", answers=None, student_id=""):
     if task == "generate":
         if lang == "ar":
             return f"""
             أنت خبير في إعداد الاختبارات.
-
-            المهمة: أنشئ {count} أسئلة فريدة ومبتكرة لامتحان {exam_type}.  
-            الصف: {grade}  
-            المادة: {subject}  
+            المهمة: أنشئ {count} أسئلة فريدة ومبتكرة لامتحان {exam_type}.
+            الصف: {grade}
+            المادة: {subject}
 
             ✅ القواعد:
-            - لا يوجد أسئلة مكررة.
-            - يجب أن تكون الأسئلة متنوعة ومناسبة للمستوى.
-            - كل سؤال يجب أن يحتوي على:
+            - لا تكرر الأسئلة.
+            - يجب أن تحتوي كل سؤال على:
                 "id": رقم,
                 "difficulty": "سهل" أو "متوسط" أو "صعب",
                 "question": "نص السؤال",
                 "options": ["أ", "ب", "ج", "د"],
                 "correct_answer": "الإجابة الصحيحة"
-            - أرجع فقط مصفوفة JSON صحيحة بدون أي شروح.
+            - أرجع فقط مصفوفة JSON صحيحة بدون شروحات.
             """
         else:
             return f"""
             You are an expert exam creator.
 
-            Task: Generate {count} UNIQUE and creative questions for a {exam_type} exam.  
-            Grade: {grade}  
-            Subject: {subject}  
+            Task: Generate {count} unique and creative questions for a {exam_type} exam.
+            Grade: {grade}
+            Subject: {subject}
 
             ✅ Rules:
-            - No repeated questions.
+            - No duplicate questions.
             - Each question must include:
                 "id": number,
                 "difficulty": "Easy" or "Medium" or "Hard",
                 "question": "the question text",
                 "options": ["A", "B", "C", "D"],
                 "correct_answer": "the correct option"
-            - Return ONLY a valid JSON array.
+            - Return ONLY a valid JSON array, no explanations.
             """
     else:
         if lang == "ar":
@@ -302,29 +97,43 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
             }}
             """
 
-# 🟢 Route: Generate Questions
+# 🟢 Helper to call Gemini safely
+def call_gemini(prompt):
+    """Handles Gemini API request with retry and timeout."""
+    for attempt in range(2):  # retry twice
+        try:
+            resp = requests.post(
+                GEMINI_URL,
+                headers={"Content-Type": "application/json"},
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+                timeout=70
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            print(f"⚠️ Gemini request failed (attempt {attempt+1}): {e}")
+            if attempt == 1:
+                raise e
+            time.sleep(3)  # wait before retry
+
+
+# 🟢 Generate Questions Endpoint
 @app.route("/generate-questions", methods=["POST"])
 def generate_questions():
-    data = request.get_json()
-    exam_type = data.get("examType", "TIMSS")
-    grade = data.get("grade", "Grade 8")
-    subject = data.get("subject", "Math")
-    count = data.get("count", 5)
-    lang = data.get("lang", "en")
-
-    prompt = build_prompt(exam_type, grade, subject, count, lang=lang, task="generate")
-
     try:
-        resp = requests.post(
-            GEMINI_URL,
-            headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-        )
-        resp.raise_for_status()
-        gemini_data = resp.json()
+        data = request.get_json(force=True)
+        exam_type = data.get("examType", "TIMSS")
+        grade = data.get("grade", "Grade 8")
+        subject = data.get("subject", "Math")
+        count = data.get("count", 5)
+        lang = data.get("lang", "en")
 
+        prompt = build_prompt(exam_type, grade, subject, count, lang=lang, task="generate")
+
+        gemini_data = call_gemini(prompt)
         raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
 
+        # Try to parse valid JSON array
         try:
             questions = json.loads(raw_text)
         except:
@@ -332,39 +141,34 @@ def generate_questions():
             if match:
                 questions = json.loads(match.group(0))
             else:
-                return jsonify({"error": "Invalid JSON from Gemini", "raw": raw_text}), 500
+                return jsonify({"error": "Invalid JSON returned from Gemini", "raw": raw_text}), 500
 
         return jsonify({
             "examType": exam_type,
             "timeLimit": "40 minutes",
             "questions": questions
-        })
+        }), 200
 
     except Exception as e:
+        print("❌ Error in /generate-questions:", e)
         return jsonify({"error": "Failed to generate questions", "details": str(e)}), 500
 
 
-# 🟢 Route: Evaluate Answers
+# 🟢 Evaluate Endpoint
 @app.route("/evaluate", methods=["POST"])
 def evaluate():
-    data = request.get_json()
-    exam_type = data.get("examType", "TIMSS")
-    grade = data.get("grade", "Grade 8")
-    subject = data.get("subject", "Math")
-    student_id = data.get("studentId", "test_student")
-    answers = data.get("answers", [])
-    lang = data.get("lang", "en")
-
-    prompt = build_prompt(exam_type, grade, subject, None, lang=lang, task="evaluate", answers=answers, student_id=student_id)
-
     try:
-        resp = requests.post(
-            GEMINI_URL,
-            headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-        )
-        resp.raise_for_status()
-        gemini_data = resp.json()
+        data = request.get_json(force=True)
+        exam_type = data.get("examType", "TIMSS")
+        grade = data.get("grade", "Grade 8")
+        subject = data.get("subject", "Math")
+        student_id = data.get("studentId", "test_student")
+        answers = data.get("answers", [])
+        lang = data.get("lang", "en")
+
+        prompt = build_prompt(exam_type, grade, subject, None, lang=lang, task="evaluate", answers=answers, student_id=student_id)
+
+        gemini_data = call_gemini(prompt)
         raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
 
         try:
@@ -376,12 +180,19 @@ def evaluate():
             else:
                 feedback_json = {"score": None, "feedback": raw_text}
 
-        return jsonify(feedback_json)
+        return jsonify(feedback_json), 200
 
     except Exception as e:
+        print("❌ Error in /evaluate:", e)
         return jsonify({"error": "Failed to evaluate answers", "details": str(e)}), 500
 
 
-# ✅ Run Server
+# ✅ Health check route
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"status": "EduPortal Flask API running successfully"}), 200
+
+
+# ✅ Run locally (Render uses gunicorn)
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)
