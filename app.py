@@ -534,40 +534,66 @@ app = Flask(__name__)
 
 # 🔑 Gemini API Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+)
 
 
 # 🧠 Helper Function: Build Prompt
-def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", answers=None, student_id=""):
+def build_prompt(exam_type, grade, subject, count,
+                 lang="en", task="generate", answers=None, student_id=""):
+    """
+    Build the generation or evaluation prompt for Gemini API.
+    """
     # ---------------------- GENERATION MODE ----------------------
     if task == "generate":
-        # Arabic Prompt
+
+        # ========== Arabic Prompt ==========
         if lang == "ar":
             exam_type_lower = exam_type.strip().lower()
 
             # Context by exam type
             if "بيرلز" in exam_type_lower or "pirls" in exam_type_lower:
                 framework_context = f"""
-                اختبار PIRLS هو اختبار دولي لقياس مهارات الفهم القرائي لدى طلاب الصف {grade}.
-                الهدف هو قياس قدرة الطالب على فهم النصوص الأدبية والمعلوماتية من خلال الإجابة عن أسئلة تعتمد على النص فقط.
+                اختبار PIRLS هو اختبار دولي لقياس الفهم القرائي لدى طلاب الصف {grade}.
+                يتكون الامتحان من **نص واقعي قصير (80–120 كلمة)** يليه **{count} أسئلة متعددة الخيارات**
+                تعتمد فقط على هذا النص.
 
-                📘 مكونات الاختبار:
-                1. نص واقعي قصير (يتراوح بين 80 إلى 120 كلمة) يناسب عمر طلاب الصف {grade}.
-                   يمكن أن يكون النص قصصيًا أو معلوماتيًا، ولكن يجب أن يكون ذا معنى واقعي وواضح.
-                2. {count} أسئلة متعددة الخيارات تعتمد بشكل مباشر على النص.
+                🔹 مهم جدًا:
+                - ابدأ دائمًا بكتابة النص أولًا داخل الحقل "reading_passage".
+                - لا تكتب أي سؤال إلا بعد كتابة النص.
+                - يجب أن تكون جميع الأسئلة مستندة مباشرة إلى معلومات من النص.
+                - لا تسأل عن أشياء غير مذكورة في النص.
+                - لا تستخدم عناصر خيالية أو رمزية.
 
-                🎯 يجب أن تقيس الأسئلة المهارات التالية:
+                🧠 مهارات الأسئلة يجب أن تشمل:
                 - الفكرة الرئيسة
                 - التفاصيل الداعمة
                 - المفردات والمعاني
                 - الاستنتاج والاستدلال
                 - الغرض من النص
 
-                🧩 تعليمات مهمة:
-                - لا تبتكر أحداثًا أو أسماء غير منطقية.
-                - لا تستخدم نصوصًا خيالية أو مبالغًا فيها.
-                - اجعل اللغة عربية سليمة وواضحة مناسبة للصف {grade}.
-                - يجب أن تكون جميع الأسئلة مرتبطة بالنص مباشرة.
+                ⚙️ الصيغة المطلوبة:
+                {{
+                  "exam_type": "PIRLS",
+                  "grade": "{grade}",
+                  "subject": "{subject}",
+                  "reading_passage": "اكتب هنا نصًا واقعيًا مناسبًا للصف {grade} (80–120 كلمة).",
+                  "questions": [
+                    {{
+                      "id": 1,
+                      "difficulty": "سهل",
+                      "question": "اكتب هنا سؤالًا يعتمد مباشرة على النص.",
+                      "options": ["...", "...", "...", "..."],
+                      "correct_answer": "...",
+                      "skill": "الفكرة الرئيسة"
+                    }}
+                  ]
+                }}
+
+                أرجع فقط كائن JSON صحيح يحتوي على النص والأسئلة معًا.
+                لا تكتب أي نص خارج JSON.
                 """
 
             elif "تيمس" in exam_type_lower or "timss" in exam_type_lower:
@@ -581,8 +607,8 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
 
             elif "بيزا" in exam_type_lower or "pisa" in exam_type_lower:
                 framework_context = f"""
-                اختبار PISA يقيس مهارات التفكير النقدي وحل المشكلات في مواقف حياتية واقعية لطلاب الصف {grade}.
-                الأسئلة يجب أن تكون تطبيقية وتربط بين التعلم والواقع اليومي.
+                اختبار PISA يقيس مهارات التفكير النقدي وحل المشكلات في مواقف حياتية واقعية
+                لطلاب الصف {grade}. الأسئلة يجب أن تكون تطبيقية وتربط بين التعلم والواقع اليومي.
                 """
 
             else:
@@ -594,7 +620,8 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
             {framework_context}
 
             🎯 المطلوب:
-            إنشاء اختبار يحتوي على {count} أسئلة أصلية وواقعية، مرتبة حسب الصعوبة (سهل، متوسط، صعب).
+            إنشاء اختبار يحتوي على {count} أسئلة أصلية وواقعية،
+            مرتبة حسب الصعوبة (سهل، متوسط، صعب).
 
             🧩 القواعد العامة:
             - لا تكتب أي نص خيالي أو غير منطقي.
@@ -632,7 +659,7 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
             أرجع فقط كائن JSON صالح بدون أي نص خارجي.
             """
 
-        # English Prompt
+        # ========== English Prompt ==========
         else:
             exam_type_lower = exam_type.strip().lower()
 
@@ -670,7 +697,9 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
                 """
 
             else:
-                framework_context = f"International {exam_type} exam for Grade {grade} in {subject}."
+                framework_context = (
+                    f"International {exam_type} exam for Grade {grade} in {subject}."
+                )
 
             # English Prompt Template
             return f"""
@@ -792,14 +821,23 @@ def generate_questions():
         gemini_data = resp.json()
         raw_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
 
+        # 🧩 Parse Gemini Response
         try:
             questions = json.loads(raw_text)
-        except:
-            match = re.search(r"\[.*\]", raw_text, re.S)
+        except Exception:
+            match = re.search(r"\{.*\}", raw_text, re.S)
             if match:
                 questions = json.loads(match.group(0))
             else:
                 return jsonify({"error": "Invalid JSON from Gemini", "raw": raw_text}), 500
+
+        # 🧠 Verify reading_passage presence for PIRLS
+        if isinstance(questions, dict) and "PIRLS" in exam_type.upper():
+            if not questions.get("reading_passage") or len(questions["reading_passage"]) < 50:
+                return jsonify({
+                    "error": "Gemini لم يُرجع نص القراءة. يُرجى إعادة المحاولة.",
+                    "raw": questions
+                }), 400
 
         return jsonify({
             "examType": exam_type,
@@ -808,7 +846,10 @@ def generate_questions():
         })
 
     except Exception as e:
-        return jsonify({"error": "Failed to generate questions", "details": str(e)}), 500
+        return jsonify({
+            "error": "Failed to generate questions",
+            "details": str(e)
+        }), 500
 
 
 # 🟢 Endpoint: Evaluate Answers
@@ -822,8 +863,10 @@ def evaluate():
     answers = data.get("answers", [])
     lang = data.get("lang", "en")
 
-    prompt = build_prompt(exam_type, grade, subject, None, lang=lang,
-                          task="evaluate", answers=answers, student_id=student_id)
+    prompt = build_prompt(
+        exam_type, grade, subject, None,
+        lang=lang, task="evaluate", answers=answers, student_id=student_id
+    )
 
     try:
         resp = requests.post(
@@ -838,7 +881,7 @@ def evaluate():
 
         try:
             feedback_json = json.loads(raw_text)
-        except:
+        except Exception:
             match = re.search(r"\{.*\}", raw_text, re.S)
             if match:
                 feedback_json = json.loads(match.group(0))
@@ -848,7 +891,10 @@ def evaluate():
         return jsonify(feedback_json)
 
     except Exception as e:
-        return jsonify({"error": "Failed to evaluate answers", "details": str(e)}), 500
+        return jsonify({
+            "error": "Failed to evaluate answers",
+            "details": str(e)
+        }), 500
 
 
 # 🏁 Run Application
