@@ -202,7 +202,7 @@ app = Flask(__name__)
 
 # 🔑 Gemini API
 GEMINI_API_KEY = os.getenv("AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s"
 
 
 # 🟢 Helper: Build Prompt
