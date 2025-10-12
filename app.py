@@ -406,8 +406,11 @@ import re
 app = Flask(__name__)
 
 # 🔑 Gemini API Configuration
-GEMINI_API_KEY = os.getenv("AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyA1tOLp9zmbiBprpuhQZqq7s6TERss4x7s"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_URL = (
+    f"https://generativelanguage.googleapis.com/v1beta/models/"
+    f"gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+)
 
 
 # 🟢 Helper: Build Prompt
@@ -616,5 +619,5 @@ def evaluate():
 
 
 # 🟢 Run Flask App
-# if __name__ == "__main__":
-#     app.run(debug=True, port=5000)
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
