@@ -13,78 +13,60 @@ def build_prompt(exam_type, grade, subject, count, lang="en", task="generate", a
     if task == "generate":
         if lang == "ar":
             return f"""
-            أنت خبير تربوي مختص في تصميم اختبارات {exam_type} وفق الأطر الرسمية (مثل PIRLS، TIMSS، PISA).
-            المطلوب: إنشاء {count} سؤالًا واقعيًا، أصيلًا، ومرتبطًا بالمنهج الدراسي، للصف {grade} في مادة {subject}.
+            أنت خبير في إعداد الاختبارات.
 
-            🧩 معايير إنشاء الأسئلة:
-            - لا تبتكر مفاهيم غير موجودة في المناهج الدراسية.
-            - لا تطرح أسئلة خيالية أو غير منطقية.
-            - يجب أن تقيس مهارة واضحة مثل: الفهم، التحليل، التطبيق، أو الاستدلال.
-            - استخدم لغة بسيطة وواضحة مناسبة لعمر الطلاب.
-            - وزّع الأسئلة على مستويات صعوبة (سهل، متوسط، صعب).
-            - لا تضف أي شرح أو ملاحظات خارج صيغة JSON.
+            المهمة: أنشئ {count} أسئلة فريدة ومبتكرة لامتحان {exam_type}.  
+            الصف: {grade}  
+            المادة: {subject}  
 
-            ⚙️ الصيغة المطلوبة (JSON فقط):
+            ✅ القواعد:
+            - لا يوجد أسئلة مكررة.
+            - يجب أن تكون الأسئلة متنوعة ومناسبة للمستوى.
+            - كل سؤال يجب أن يحتوي على:
+                "id": رقم,
+                "question": "نص السؤال",
+                "options": ["أ", "ب", "ج", "د"],
+                "correct_answer": "الإجابة الصحيحة"
+            - استخدم مستويات صعوبة مختلفة (سهل، متوسط، صعب).
+            - أرجع فقط مصفوفة JSON صحيحة بدون أي شروح.
+
+            مثال:
             [
               {{
                 "id": 1,
                 "difficulty": "سهل",
-                "question": "ما نتيجة 12 ÷ 3؟",
-                "options": ["2", "3", "4", "5"],
-                "correct_answer": "4",
-                "skill": "الحساب العددي"
+                "question": "ما نتيجة 2 + 2؟",
+                "options": ["3", "4", "5", "6"],
+                "correct_answer": "4"
               }},
               {{
                 "id": 2,
                 "difficulty": "متوسط",
-                "question": "ما الهدف من الفقرة الرئيسية في النص؟",
-                "options": ["التسلية", "الإقناع", "الوصف", "الشرح"],
-                "correct_answer": "الشرح",
-                "skill": "فهم المقروء"
+                "question": "حل: 5س - 7 = 18",
+                "options": ["س=3", "س=4", "س=5", "س=6"],
+                "correct_answer": "س=5"
               }}
             ]
-
-            أرجع فقط مصفوفة JSON صحيحة دون أي نص إضافي.
             """
-        else:
+        else:  # English prompt
             return f"""
-            You are an educational assessment expert specializing in international exams such as {exam_type} (e.g., PIRLS, TIMSS, PISA).
+            You are an expert exam creator.
 
-            🎯 Task:
-            Generate {count} high-quality, realistic, and curriculum-aligned multiple-choice questions
-            for Grade {grade} in {subject}.
+            Task: Generate {count} UNIQUE and Creative questions for a {exam_type} exam.  
+            Grade: {grade}  
+            Subject: {subject}  
 
-            🧠 Guidelines:
-            - Questions must reflect **real-world educational content**, not fantasy or fictional scenarios.
-            - Avoid nonsense or abstract ideas. Stay within logical, grade-appropriate boundaries.
-            - Each question should assess a clear **cognitive skill**: understanding, reasoning, application, or interpretation.
-            - Use clear, age-appropriate language and precise grammar.
-            - Include a **difficulty** label: Easy, Medium, or Hard.
-            - DO NOT include explanations or extra text — return valid JSON only.
-
-            ⚙️ Required JSON structure:
-            [
-              {{
-                "id": 1,
-                "difficulty": "Easy",
-                "question": "What is 15 ÷ 3?",
-                "options": ["3", "4", "5", "6"],
-                "correct_answer": "5",
-                "skill": "Numerical calculation"
-              }},
-              {{
-                "id": 2,
-                "difficulty": "Medium",
-                "question": "What is the main idea of the passage?",
-                "options": ["To inform", "To entertain", "To describe", "To argue"],
-                "correct_answer": "To inform",
-                "skill": "Reading comprehension"
-              }}
-            ]
-
-            Return **only** the JSON array, no extra text or commentary.
+            ✅ Rules:
+            - No duplicate or repeated questions.
+            - Creative and varied concepts for each question.
+            - Each question must have:
+                "id": number,
+                "question": "the question text",
+                "options": ["A", "B", "C", "D"],
+                "correct_answer": "the correct option"
+            - Use **different difficulty levels** (Easy, Medium, Hard).
+            - Return ONLY a valid JSON array with no explanations.
             """
-
     else:  # evaluate
         if lang == "ar":
             return f"""
