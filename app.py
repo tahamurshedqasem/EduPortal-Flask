@@ -201,7 +201,7 @@ import requests, os, json, re
 app = Flask(__name__)
 
 # 🔑 Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("AIzaSyA6VyEO3weAJLVm39d_GmmSlzkn8NvTuZw")
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 
